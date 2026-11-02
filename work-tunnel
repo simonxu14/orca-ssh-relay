@@ -1,0 +1,67 @@
+#!/bin/bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/lib/config.sh"
+STATE_DIR="$ORCA_RELAY_STATE_DIR"
+CONFIG="${ORCA_RELAY_WORK_SSH_CONFIG:-$STATE_DIR/ssh_config_work}"
+TARGET="${ORCA_RELAY_WORK_TARGET:-orca-cloud-work}"
+SSH=/usr/bin/ssh
+BACKUP_PORT="${ORCA_RELAY_BACKUP_PORT:-17668}"
+require_port "$BACKUP_PORT"
+URL="http://127.0.0.1:$BACKUP_PORT/"
+if [[ ! "$TARGET" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]]; then
+  echo "无效的 SSH Host 别名。" >&2
+  exit 1
+fi
+
+require_backup_config() {
+  if [ ! -f "$CONFIG" ]; then
+    echo "备用通道配置不存在：$CONFIG" >&2
+    exit 1
+  fi
+}
+
+case "${1:-status}" in
+  environments)
+    exec /usr/bin/env ELECTRON_RUN_AS_NODE=1 "$ORCA_APP_PATH/Contents/MacOS/Orca" "$SCRIPT_DIR/native-status.js" --environments
+    ;;
+  status)
+    # Daily checks use only the Orca-managed endpoint, not the old SSH master.
+    exec /usr/bin/env ELECTRON_RUN_AS_NODE=1 "$ORCA_APP_PATH/Contents/MacOS/Orca" "$SCRIPT_DIR/native-status.js" "${@:2}"
+    ;;
+  start|backup-start)
+    require_backup_config
+    echo "这是 $BACKUP_PORT 备用转发；日常打开 Orca 即可，无需运行此脚本。"
+    if ! "$SSH" -F "$CONFIG" -O check "$TARGET" >/dev/null 2>&1; then
+      "$SSH" -F "$CONFIG" -fNT "$TARGET"
+    fi
+    if /usr/bin/curl --noproxy '*' --fail --silent --show-error --max-time 8 "$URL" -o /dev/null; then
+      echo "备用入口已可达：ws://127.0.0.1:$BACKUP_PORT"
+      echo "启动备用不会自动切换 Orca。回退需在家里主机的 SSH access 中选择 Stop using SSH。"
+    else
+      "$SSH" -F "$CONFIG" -O exit "$TARGET" >/dev/null 2>&1 || true
+      echo "家里端尚未连接，或 Orca 未运行。已关闭本次本地转发。" >&2
+      exit 2
+    fi
+    ;;
+  stop|backup-stop)
+    require_backup_config
+    if "$SSH" -F "$CONFIG" -O check "$TARGET" >/dev/null 2>&1; then
+      "$SSH" -F "$CONFIG" -O exit "$TARGET"
+      echo "备用转发已停止；Orca 原生 SSH 主通道不受影响。"
+    else
+      echo "备用转发未运行（正常，日常不需要）。"
+    fi
+    ;;
+  backup-status)
+    require_backup_config
+    if "$SSH" -F "$CONFIG" -O check "$TARGET" >/dev/null 2>&1; then
+      /usr/bin/curl --noproxy '*' --fail --silent --show-error --max-time 5 "$URL" -o /dev/null
+      echo "旧备用转发和远端 HTTP 均可达；会话权限由 Orca 配对验证。"
+    else
+      echo "备用转发未运行（正常，日常不需要）。"
+    fi
+    ;;
+  help|-h|--help) echo "用法：$0 environments|status [--json]|backup-start|backup-stop|backup-status（start/stop 是备用兼容别名）" ;;
+  *) echo "用法：$0 environments|status [--json]|backup-start|backup-stop|backup-status" >&2; exit 64 ;;
+esac

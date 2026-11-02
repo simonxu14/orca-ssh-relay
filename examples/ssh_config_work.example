@@ -1,0 +1,23 @@
+Host orca-cloud-work
+    HostName relay.example.com
+    User orca-work-client
+    Port 22
+    IdentityFile ~/.ssh/orca-relay/work_ed25519
+    IdentitiesOnly yes
+    BatchMode yes
+    StrictHostKeyChecking yes
+    UserKnownHostsFile ~/.ssh/orca-relay/known_hosts
+    GlobalKnownHostsFile /dev/null
+    UpdateHostKeys no
+    ForwardAgent no
+    ForwardX11 no
+    GSSAPIAuthentication no
+    RequestTTY no
+    ExitOnForwardFailure yes
+    ServerAliveInterval 30
+    ServerAliveCountMax 3
+    ConnectTimeout 10
+    ControlMaster auto
+    ControlPath ~/.ssh/orca-relay/work-control
+    ControlPersist no
+    LocalForward 127.0.0.1:17668 127.0.0.1:16768

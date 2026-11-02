@@ -1,0 +1,43 @@
+# Example only. An administrator must review and validate the effective policy.
+# Dedicated accounts and their authorized public keys must already exist.
+Match User orca-home-relay
+    AuthenticationMethods publickey
+    PubkeyAuthentication yes
+    PasswordAuthentication no
+    KbdInteractiveAuthentication no
+    AllowTcpForwarding remote
+    PermitListen 127.0.0.1:16768
+    PermitOpen none
+    AllowStreamLocalForwarding no
+    AllowAgentForwarding no
+    X11Forwarding no
+    PermitTTY no
+    PermitTunnel no
+    PermitUserRC no
+    MaxSessions 0
+    ForceCommand /usr/bin/false
+    GatewayPorts no
+    ClientAliveInterval 30
+    ClientAliveCountMax 3
+
+Match User orca-work-client
+    AuthenticationMethods publickey
+    PubkeyAuthentication yes
+    PasswordAuthentication no
+    KbdInteractiveAuthentication no
+    AllowTcpForwarding local
+    PermitOpen 127.0.0.1:16768
+    PermitListen none
+    AllowStreamLocalForwarding no
+    AllowAgentForwarding no
+    X11Forwarding no
+    PermitTTY no
+    PermitTunnel no
+    PermitUserRC no
+    MaxSessions 0
+    ForceCommand /usr/bin/false
+    GatewayPorts no
+    ClientAliveInterval 30
+    ClientAliveCountMax 3
+
+Match all
